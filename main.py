@@ -1,11 +1,12 @@
 import sys
+import random
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton,
     QStackedWidget, QHBoxLayout
 )
 from PyQt5.QtCore import Qt, QUrl, QTimer
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-import random
+
 
 # ----------------- Pages -----------------
 class StartPage(QWidget):
@@ -24,27 +25,25 @@ class StartPage(QWidget):
         start_btn.clicked.connect(lambda: self.controller.start_game())
         start_btn.setCursor(Qt.PointingHandCursor)
         start_btn.setStyleSheet("""
-                                font-size:70px;
-                                padding:30px 80px;
-                                border-style: outset;
-                                border-width: 2px;
-                                border-radius: 15px;
-                                border-color: black;
-                                
-                                """)
+            font-size:70px;
+            padding:30px 80px;
+            border-style: outset;
+            border-width: 2px;
+            border-radius: 15px;
+            border-color: black;
+        """)
 
         about_btn = QPushButton("درباره بازی")
         about_btn.clicked.connect(lambda: self.controller.show_page('About'))
         about_btn.setCursor(Qt.PointingHandCursor)
         about_btn.setStyleSheet("""
-                                font-size:50px;
-                                padding:15px 40px;
-                                border-style: outset;
-                                border-width: 2px;
-                                border-radius: 15px;
-                                border-color: black;
-                                
-                                """)
+            font-size:50px;
+            padding:15px 40px;
+            border-style: outset;
+            border-width: 2px;
+            border-radius: 15px;
+            border-color: black;
+        """)
 
         layout.addStretch()
         layout.addWidget(lbl, alignment=Qt.AlignCenter)
@@ -55,6 +54,7 @@ class StartPage(QWidget):
         layout.addStretch()
         self.setLayout(layout)
 
+
 class AboutPage(QWidget):
     def __init__(self, controller):
         super().__init__()
@@ -64,112 +64,133 @@ class AboutPage(QWidget):
     def init_ui(self):
         layout = QVBoxLayout()
 
-        start_btn = QPushButton("برگشت")
-        start_btn.clicked.connect(lambda: self.controller.show_page('Start'))
-        start_btn.setCursor(Qt.PointingHandCursor)
-        start_btn.setStyleSheet("""
-                                font-size:40px;
-                                padding:10px 30px;
-                                border-style: outset;
-                                border-width: 2px;
-                                border-radius: 15px;
-                                border-color: black;
-                                
-                                """)
-        
+        back_btn = QPushButton("برگشت")
+        back_btn.clicked.connect(lambda: self.controller.show_page('Start'))
+        back_btn.setCursor(Qt.PointingHandCursor)
+        back_btn.setStyleSheet("""
+            font-size:40px;
+            padding:10px 30px;
+            border-style: outset;
+            border-width: 2px;
+            border-radius: 15px;
+            border-color: black;
+        """)
+
         about_lbl = QLabel("این بازی برای آموزش حروف الفبای فارسی طراحی شده است.")
         about_lbl.setStyleSheet("font-size:50px; font-weight:600;")
         about_lbl.setAlignment(Qt.AlignCenter)
 
-        layout.addWidget(start_btn, alignment=Qt.AlignLeft)
+        layout.addWidget(back_btn, alignment=Qt.AlignLeft)
         layout.addStretch()
-        
         layout.addWidget(about_lbl, alignment=Qt.AlignCenter)
         layout.addStretch()
         self.setLayout(layout)
+
 
 class LetterPage(QWidget):
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
+        self.player = QMediaPlayer()
         self.init_ui()
 
     def init_ui(self):
+        # Clear layout if re-initialized
+        for i in reversed(range(self.layout().count() if self.layout() else 0)):
+            item = self.layout().itemAt(i)
+            if item.widget():
+                item.widget().deleteLater()
+
         layout = QVBoxLayout()
+
         exit_btn = QPushButton("خروج")
         exit_btn.clicked.connect(lambda: self.controller.end_game())
         exit_btn.setCursor(Qt.PointingHandCursor)
         exit_btn.setStyleSheet("""
-                                font-size:40px;
-                                padding:10px 30px;
-                                border-style: outset;
-                                border-width: 2px;
-                                border-radius: 15px;
-                                border-color: black;
-                                
-                                """)
-        
+            font-size:40px;
+            padding:10px 30px;
+            border-style: outset;
+            border-width: 2px;
+            border-radius: 15px;
+            border-color: black;
+        """)
         layout.addWidget(exit_btn, alignment=Qt.AlignLeft)
         layout.addStretch()
 
-        max_number = self.controller.game.keys()
-        if max_number == None or len(max_number) == 0:
-            max_number = 1
+        # ----- Generate letters -----
+        if not self.controller.game:
+            round_number = 1
         else:
-            max_number = max(max_number) + 1
-        
-        choice_letters = []
+            round_number = max(self.controller.game.keys()) + 1
 
-        for i in range(6):
-            while True:
-                letter = random.choice(self.controller.persian_letters)
-                if letter not in choice_letters:
-                    choice_letters.append(letter)
-                    break
+        choice_letters = random.sample(self.controller.persian_letters, 6)
+        correct_letter = random.choice(choice_letters)
 
-        self.correct_letter = random.choice(choice_letters)
+        self.controller.game[round_number] = [choice_letters, correct_letter]
 
-        self.controller.game[max_number] = [choice_letters, self.correct_letter]
+        # Play sound for correct letter (future-ready)
+        try:
+            sound_path = f"sounds/{correct_letter}.mp3"
+            self.player.setMedia(QMediaContent(QUrl.fromLocalFile(sound_path)))
+            self.player.play()
+        except Exception as e:
+            print(f"Sound not found for {correct_letter}: {e}")
 
-        btn_1 = QPushButton(f"{choice_letters[0]}")
-        btn_2 = QPushButton(f"{choice_letters[1]}")
-        btn_3 = QPushButton(f"{choice_letters[2]}")
-        btn_4 = QPushButton(f"{choice_letters[3]}")
-        btn_5 = QPushButton(f"{choice_letters[4]}")
-        btn_6 = QPushButton(f"{choice_letters[5]}")
+        # ----- Create buttons -----
+        buttons = []
+        for letter in choice_letters:
+            btn = QPushButton(letter)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet("""
+                font-size:70px;
+                padding:30px 80px;
+                border-style: outset;
+                border-width: 2px;
+                border-radius: 15px;
+                border-color: black;
+            """)
+            btn.clicked.connect(lambda _, l=letter: self.controller.check_answer(l))
+            buttons.append(btn)
 
-        for j in (btn_1, btn_2, btn_3, btn_4, btn_5, btn_6):
-            j.setCursor(Qt.PointingHandCursor)
-            j.setStyleSheet("""
-                                    font-size:70px;
-                                    padding:30px 80px;
-                                    border-style: outset;
-                                    border-width: 2px;
-                                    border-radius: 15px;
-                                    border-color: black;
-                                    
-                                    """)
-        btn_1.clicked.connect(lambda: self.controller.check_answer(choice_letters[0]))
-        btn_2.clicked.connect(lambda: self.controller.check_answer(choice_letters[1]))
-        btn_3.clicked.connect(lambda: self.controller.check_answer(choice_letters[2]))
-        btn_4.clicked.connect(lambda: self.controller.check_answer(choice_letters[3]))
-        btn_5.clicked.connect(lambda: self.controller.check_answer(choice_letters[4]))
-        btn_6.clicked.connect(lambda: self.controller.check_answer(choice_letters[5]))
-        
-        h_layout = QHBoxLayout()
-        h_layout.addWidget(btn_1)
-        h_layout.addWidget(btn_2)
-        h_layout.addWidget(btn_3)
-        h2_layout = QHBoxLayout()
-        h2_layout.addWidget(btn_4)
-        h2_layout.addWidget(btn_5)
-        h2_layout.addWidget(btn_6)
-        layout.addLayout(h_layout)
+        # Layout for letters
+        h1 = QHBoxLayout()
+        h2 = QHBoxLayout()
+        for i in range(3):
+            h1.addWidget(buttons[i])
+        for i in range(3, 6):
+            h2.addWidget(buttons[i])
+
+        layout.addLayout(h1)
         layout.addSpacing(50)
-        layout.addLayout(h2_layout)
+        layout.addLayout(h2)
         layout.addStretch()
 
         self.setLayout(layout)
+
+
+class ResultPage(QWidget):
+    def __init__(self, controller, correct, selected, is_correct):
+        super().__init__()
+        self.controller = controller
+        self.correct = correct
+        self.selected = selected
+        self.is_correct = is_correct
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        if self.is_correct:
+            result_lbl = QLabel("آفرین! جواب درست بود 🎉")
+        else:
+            result_lbl = QLabel(f"اشتباه! جواب درست: {self.correct}")
+        result_lbl.setStyleSheet("font-size:50px; font-weight:600;")
+        result_lbl.setAlignment(Qt.AlignCenter)
+
+        layout.addStretch()
+        layout.addWidget(result_lbl, alignment=Qt.AlignCenter)
+        layout.addStretch()
+        self.setLayout(layout)
+
 
 class EndPage(QWidget):
     def __init__(self, controller):
@@ -179,30 +200,29 @@ class EndPage(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout()
+        lbl = QLabel("پایان بازی! 🌟")
+        lbl.setStyleSheet("font-size:60px; font-weight:600;")
+        lbl.setAlignment(Qt.AlignCenter)
 
+        back_btn = QPushButton("بازگشت به منوی اصلی")
+        back_btn.clicked.connect(lambda: self.controller.show_page('Start'))
+        back_btn.setCursor(Qt.PointingHandCursor)
+        back_btn.setStyleSheet("""
+            font-size:40px;
+            padding:15px 40px;
+            border-style: outset;
+            border-width: 2px;
+            border-radius: 15px;
+            border-color: black;
+        """)
+
+        layout.addStretch()
+        layout.addWidget(lbl, alignment=Qt.AlignCenter)
+        layout.addSpacing(100)
+        layout.addWidget(back_btn, alignment=Qt.AlignCenter)
+        layout.addStretch()
         self.setLayout(layout)
 
-class ResultPage(QWidget):
-    def __init__(self, controller):
-        super().__init__()
-        self.controller = controller
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout()
-        result = self.controller.game[max(self.controller.game.keys())][3]
-        if result:
-            result_lbl = QLabel("آفرین! جواب درست بود.")
-        else:
-            correct_letter = self.controller.game[max(self.controller.game.keys())][1]
-            result_lbl = QLabel(f"متاسفانه جواب اشتباه بود. جواب درست: {correct_letter}")
-        result_lbl.setStyleSheet("font-size:50px; font-weight:600;")
-        result_lbl.setAlignment(Qt.AlignCenter)
-        layout.addStretch()
-        layout.addWidget(result_lbl, alignment=Qt.AlignCenter)
-        layout.addStretch()
-
-        self.setLayout(layout)
 
 # ----------------- Main Window -----------------
 class MainWindow(QMainWindow):
@@ -211,13 +231,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Alphabet Learning Game (بازی آموزش حروف الفبا)")
         self.setGeometry(100, 100, 1700, 1000)
 
-        # Alphabet letters
         self.persian_letters = [
             'ا', 'ب', 'پ', 'ت', 'ث', 'ج', 'چ', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز',
             'ژ', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ک', 'گ',
             'ل', 'م', 'ن', 'و', 'ه', 'ی'
         ]
-
         self.game = {}
 
         # Stack for pages
@@ -226,19 +244,18 @@ class MainWindow(QMainWindow):
 
         # Create pages
         self.start_page = StartPage(self)
+        self.about_page = AboutPage(self)
         self.letter_page = LetterPage(self)
         self.end_page = EndPage(self)
-        self.about_page = AboutPage(self)
-        # self.result_page = ResultPage(self)
 
         # Add to stack
-        for p in (self.start_page, self.letter_page, self.end_page, self.about_page):
+        for p in (self.start_page, self.about_page, self.letter_page, self.end_page):
             self.stack.addWidget(p)
 
         # Show start
         self.show_page('Start')
 
-    # Navigation API used by pages
+    # Navigation
     def show_page(self, name):
         if name == 'Start':
             self.stack.setCurrentWidget(self.start_page)
@@ -251,26 +268,35 @@ class MainWindow(QMainWindow):
         elif name == 'Result':
             self.stack.setCurrentWidget(self.result_page)
 
+    # Game logic
     def start_game(self):
+        self.letter_page = LetterPage(self)
+        self.stack.addWidget(self.letter_page)
         self.show_page('Letter')
 
     def end_game(self):
         self.show_page('End')
 
     def check_answer(self, selected_letter):
-        current_number = max(self.game.keys())
-        correct_letter = self.game[current_number][1]
-        if selected_letter == correct_letter:
-            print(f"Correct! The letter was: selected {selected_letter} correct {correct_letter}")
-        else:
-            print(f"Wrong! The correct letter was: {correct_letter} selected {selected_letter}")
-        self.game[current_number].append(selected_letter)  
-        self.game[current_number].append(True if selected_letter == correct_letter else False)
-        self.result_page = ResultPage(self)
+        current_round = max(self.game.keys())
+        correct_letter = self.game[current_round][1]
+        is_correct = selected_letter == correct_letter
+
+        # Save results
+        self.game[current_round].extend([selected_letter, is_correct])
+        print("✅ Correct!" if is_correct else f"❌ Wrong! Correct was {correct_letter}")
+
+        # Show result page
+        self.result_page = ResultPage(self, correct_letter, selected_letter, is_correct)
         self.stack.addWidget(self.result_page)
         self.show_page('Result')
+
+        # Load next after delay
         QTimer.singleShot(2000, self.load_next_letter)
+
     def load_next_letter(self):
+        self.stack.removeWidget(self.letter_page)
+        self.letter_page.deleteLater()
         self.letter_page = LetterPage(self)
         self.stack.addWidget(self.letter_page)
         self.show_page('Letter')
