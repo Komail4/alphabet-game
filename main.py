@@ -2,7 +2,7 @@ import sys
 import random
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel, QPushButton,
-    QStackedWidget, QHBoxLayout
+    QStackedWidget, QHBoxLayout, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QUrl, QTimer
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
@@ -77,13 +77,26 @@ class AboutPage(QWidget):
             border-color: black;
         """)
 
-        about_lbl = QLabel("این بازی برای آموزش حروف الفبای فارسی طراحی شده است.")
+        text_about = """این بازی برای آموزش حروف الفبا برای کودکان طراحی شده است.
+        کودک با شینیدن صدای حرف می تواند آن را از بین چندین گزینه انتخاب کند.
+        در پایان بازی، امتیاز کودک نمایش داده می شود تا والدین بتوانند پیشرفت او را دنبال کنند.
+        طراح: کمیل مدقق
+        صدا ها: ضبط شده توسط هانیه صادقی"""
+        about_lbl = QLabel(text_about)
+
         about_lbl.setStyleSheet("font-size:50px; font-weight:600;")
-        about_lbl.setAlignment(Qt.AlignCenter)
+        about_lbl.setWordWrap(True)
+        # Use RTL for Persian and allow the label to expand to the available width
+        about_lbl.setLayoutDirection(Qt.LeftToRight)
+        about_lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        about_lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        # Add without centering so the label can take full width and wrap properly
+        # layout.addWidget(about_lbl)
 
         layout.addWidget(back_btn, alignment=Qt.AlignLeft)
         layout.addStretch()
-        layout.addWidget(about_lbl, alignment=Qt.AlignCenter)
+        layout.addWidget(about_lbl, alignment=Qt.AlignLeft)
         layout.addStretch()
         self.setLayout(layout)
 
