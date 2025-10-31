@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QUrl, QTimer
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+import os
 
 
 # ----------------- Pages -----------------
@@ -92,10 +93,11 @@ class LetterPage(QWidget):
         super().__init__()
         self.controller = controller
         self.player = QMediaPlayer()
+        self.correct_letter = None  # Keep track of current letter sound
         self.init_ui()
 
     def init_ui(self):
-        # Clear layout if re-initialized
+        # Clear old layout if it exists
         for i in reversed(range(self.layout().count() if self.layout() else 0)):
             item = self.layout().itemAt(i)
             if item.widget():
@@ -103,6 +105,7 @@ class LetterPage(QWidget):
 
         layout = QVBoxLayout()
 
+        # ---- Exit button ----
         exit_btn = QPushButton("خروج")
         exit_btn.clicked.connect(lambda: self.controller.end_game())
         exit_btn.setCursor(Qt.PointingHandCursor)
@@ -117,26 +120,48 @@ class LetterPage(QWidget):
         layout.addWidget(exit_btn, alignment=Qt.AlignLeft)
         layout.addStretch()
 
-        # ----- Generate letters -----
+        # ---- Generate letters ----
         if not self.controller.game:
             round_number = 1
         else:
             round_number = max(self.controller.game.keys()) + 1
 
-        choice_letters = random.sample(self.controller.persian_letters, 6)
+        letters_pool = self.controller.persian_letters.copy()
+
+        # Prevent confusing pairs from appearing together
+        confusing_pairs = [
+            ('ح', 'ه')
+        ]
+
+        # Remove a pair partner if one is chosen
+        choice_letters = random.sample(letters_pool, 6)
+        for a, b in confusing_pairs:
+            if a in choice_letters and b in choice_letters:
+                # Remove the second one and replace with a different letter
+                replace = random.choice([x for x in letters_pool if x not in choice_letters])
+                choice_letters.remove(b)
+                choice_letters.append(replace)
+
         correct_letter = random.choice(choice_letters)
+        self.correct_letter = correct_letter  # Save for Listen button
 
         self.controller.game[round_number] = [choice_letters, correct_letter]
 
-        # Play sound for correct letter (future-ready)
-        try:
-            sound_path = f"sounds/{correct_letter}.mp3"
-            self.player.setMedia(QMediaContent(QUrl.fromLocalFile(sound_path)))
-            self.player.play()
-        except Exception as e:
-            print(f"Sound not found for {correct_letter}: {e}")
 
-        # ----- Create buttons -----
+        # ---- “Listen Again” button ----
+        listen_btn = QPushButton("🔊 گوش دادن دوباره")
+        listen_btn.setCursor(Qt.PointingHandCursor)
+        listen_btn.setStyleSheet("""
+            font-size:35px;
+            padding:10px 40px;
+            border-radius:15px;
+            border:2px solid black;
+        """)
+        listen_btn.clicked.connect(lambda: self.play_sound(self.correct_letter))
+        layout.addWidget(listen_btn, alignment=Qt.AlignCenter)
+        layout.addSpacing(30)
+
+        # ---- Letter buttons ----
         buttons = []
         for letter in choice_letters:
             btn = QPushButton(letter)
@@ -165,8 +190,21 @@ class LetterPage(QWidget):
         layout.addLayout(h2)
         layout.addStretch()
 
+        if not self.controller.first_play:
+            QTimer.singleShot(1000, lambda: self.play_sound(correct_letter))
+
+        self.controller.first_play = False
+
         self.setLayout(layout)
 
+    def play_sound(self, letter):
+        """Plays the sound of the given letter."""
+        try:
+            sound_path = os.path.abspath(f"sounds/{letter}.wav")
+            self.player.setMedia(QMediaContent(QUrl.fromLocalFile(sound_path)))
+            self.player.play()
+        except Exception as e:
+            print(f"❌ Could not play sound for {letter}: {e}")
 
 class ResultPage(QWidget):
     def __init__(self, controller, correct, selected, is_correct):
@@ -200,24 +238,73 @@ class EndPage(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout()
-        lbl = QLabel("پایان بازی! 🌟")
-        lbl.setStyleSheet("font-size:60px; font-weight:600;")
-        lbl.setAlignment(Qt.AlignCenter)
 
-        back_btn = QPushButton("بازگشت به منوی اصلی")
-        back_btn.clicked.connect(lambda: self.controller.show_page('Start'))
+        # ---- Title ----
+        title_lbl = QLabel("پایان بازی 🎉")
+        title_lbl.setStyleSheet("font-size:70px; font-weight:600;")
+        title_lbl.setAlignment(Qt.AlignCenter)
+
+        # ---- Calculate Score ----
+        if len(self.controller.game) > 2:
+            if self.controller.check_1:
+                number = 2
+                self.controller.check_1 = False
+            else:
+                number = 1
+            total = len(self.controller.game) - number
+            correct = sum(1 for data in self.controller.game.values() if len(data) >= 4 and data[3] is True)
+
+            # Prevent division by zero
+            if total > 0:
+                percentage = (correct / total) * 100
+                score_text = f"امتیاز شما: {total} / {correct}"
+                if percentage == 100:
+                    msg = "عالی بود! 👏"
+                elif percentage >= 70:
+                    msg = "خیلی خوب بود! ادامه بده 🌟"
+                elif percentage >= 40:
+                    msg = "خوب بود! تمرین بیشتر کن 💪"
+                else:
+                    msg = "مشکلی نیست، دوباره امتحان کن 🙂"
+            else:
+                score_text = "شما هنوز هیچ سوالی پاسخ نداده‌اید."
+                msg = ""
+        else:
+            score_text = "شما هنوز هیچ سوالی پاسخ نداده‌اید."
+            msg = ""
+            
+        
+
+
+        score_lbl = QLabel(score_text)
+        score_lbl.setStyleSheet("font-size:60px; color:blue; font-weight:600;")
+        score_lbl.setAlignment(Qt.AlignCenter)
+
+        # ---- Encouragement Message ----
+        
+
+        msg_lbl = QLabel(msg)
+        msg_lbl.setStyleSheet("font-size:50px; color:green; font-weight:500;")
+        msg_lbl.setAlignment(Qt.AlignCenter)
+
+        # ---- Back Button ----
+        back_btn = QPushButton("بازگشت به صفحه اصلی")
         back_btn.setCursor(Qt.PointingHandCursor)
         back_btn.setStyleSheet("""
             font-size:40px;
-            padding:15px 40px;
-            border-style: outset;
-            border-width: 2px;
-            border-radius: 15px;
-            border-color: black;
+            padding:15px 50px;
+            border:2px solid black;
+            border-radius:15px;
         """)
+        back_btn.clicked.connect(lambda: self.controller.back_start_page())
 
+        # ---- Layout ----
         layout.addStretch()
-        layout.addWidget(lbl, alignment=Qt.AlignCenter)
+        layout.addWidget(title_lbl, alignment=Qt.AlignCenter)
+        layout.addSpacing(50)
+        layout.addWidget(score_lbl, alignment=Qt.AlignCenter)
+        layout.addSpacing(30)
+        layout.addWidget(msg_lbl, alignment=Qt.AlignCenter)
         layout.addSpacing(100)
         layout.addWidget(back_btn, alignment=Qt.AlignCenter)
         layout.addStretch()
@@ -237,6 +324,10 @@ class MainWindow(QMainWindow):
             'ل', 'م', 'ن', 'و', 'ه', 'ی'
         ]
         self.game = {}
+
+        self.first_play = True
+
+        self.check_1 = True
 
         # Stack for pages
         self.stack = QStackedWidget()
@@ -275,7 +366,19 @@ class MainWindow(QMainWindow):
         self.show_page('Letter')
 
     def end_game(self):
+        # Ensure the current question is saved properly
+        if self.game:
+            current_round = max(self.game.keys())
+            # If user exited before answering, mark it as incorrect
+            if len(self.game[current_round]) < 4:
+                self.game[current_round].extend([None, False])
+
+        # Now show the End page with correct data
+        self.end_page = EndPage(self)
+        self.stack.addWidget(self.end_page)
         self.show_page('End')
+        self.check_1 = False
+
 
     def check_answer(self, selected_letter):
         current_round = max(self.game.keys())
@@ -300,6 +403,11 @@ class MainWindow(QMainWindow):
         self.letter_page = LetterPage(self)
         self.stack.addWidget(self.letter_page)
         self.show_page('Letter')
+    
+    def back_start_page(self):
+        self.show_page('Start')
+        self.game = {}
+        
 
 # ----------------- Run App -----------------
 def main():
